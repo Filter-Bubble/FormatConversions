@@ -47,7 +47,7 @@ def get_tokens(alpino_node, word_count, token_dict = {}, highest_count = 0):
 
 
 def get_constituent(alpino_node, word_count, words=[]):
-    
+
     for child in alpino_node.getchildren():
         if child.get('word') is not None:
             if len(words) < 1:
@@ -69,9 +69,9 @@ def create_span(target_ids):
     return span
 
 def add_role(pred, role, span):
-    
+
     global sid
-    
+
     sid += 1
     s_id = 's' + str(sid)
 
@@ -85,7 +85,7 @@ def add_role(pred, role, span):
 
 def add_pb_obj_to_naf(nafobj, pbdict):
     global pid
-    
+
     pid += 1
     p_id = 'p' + str(pid)
     mypred = Cpredicate()
@@ -105,7 +105,7 @@ def add_pb_obj_to_naf(nafobj, pbdict):
 def find_propbank_rels(elem, nafobj, word_count):
 
     global missed_rels
-    
+
     pb_dict = {}
     for ch in elem.getchildren():
         pb = ch.get('pb')
@@ -120,7 +120,7 @@ def find_propbank_rels(elem, nafobj, word_count):
                 pb_dict[pb] = [myconstituent]
             else:
                 pb_dict[pb].append(myconstituent)
-    
+
         find_propbank_rels(ch, nafobj, word_count)
 
     if 'rel' in pb_dict:
@@ -314,7 +314,7 @@ def add_dependencies_to_naf(elem, nafobj, word_count):
 def create_token_and_term_layer(token_dict, token_info, nafobj):
 
     global offset
-    
+
     for idnr, val in sorted(token_dict.items()):
         if offset != 0:
             offset += 1
@@ -329,7 +329,7 @@ def create_token_and_term_layer(token_dict, token_info, nafobj):
         tok.set_length(str(length))
         offset += length
         nafobj.add_wf(tok)
-        term_id = 't' + str(idnr)
+        term_id = 't_' + str(idnr)
         term = Cterm()
         term.set_id(term_id)
         term.set_lemma(val[1])
@@ -380,7 +380,7 @@ def create_layer_for_header(header, layer):
 
 
 def set_metadata(nafobj, filename):
-    
+
     nafobj.set_language("nl")
     header = CHeader()
     filedesc = CfileDesc()
@@ -396,7 +396,7 @@ def set_metadata(nafobj, filename):
 def make_sure_input_file_exists(filename, paragraph, sentence, dir, f):
 
     cleanedfn = filename + '.p.' + str(paragraph) + '.s.' + str(sentence) + '.xml'
-    
+
     if f != cleanedfn and not 'head' in f and f.endswith('xml'):
         if os.path.isfile(dir + cleanedfn):
             print('clean-up will not work: ' + cleanedfn + ' exists')
@@ -407,39 +407,42 @@ def collect_file_info(inputdir):
 
     my_files = {}
     inputdir += '/'
-  #  print(inputdir)
+    print(inputdir)
     for f in os.listdir(inputdir):
         parts = f.split('.')
         if len(parts) > 4:
-            filename = parts[0]
-            paragraph = int(parts[2])
-            sentence_desc = parts[4]
-            if '_' in sentence_desc:
-                sentence = float(sentence_desc.replace('_','.'))
-            elif len(parts) == 7:
-                sentence = float(parts[4] + '.' + parts[5])
-            else:
-                sentence = int(parts[4])
-            make_sure_input_file_exists(filename, paragraph, sentence, inputdir, f)
-            if filename in my_files:
-                file_info = my_files.get(filename)
-            else:
-                file_info = {}
-            if parts[1] == 'head':
-                if 'head' in file_info:
-                    head_paragraph = file_info.get('head')
+            try:
+                filename = parts[0]
+                paragraph = int(parts[2])
+                sentence_desc = parts[4]
+                if '_' in sentence_desc:
+                    sentence = float(sentence_desc.replace('_','.'))
+                elif len(parts) == 7:
+                    sentence = float(parts[4] + '.' + parts[5])
                 else:
-                    head_paragraph = {}
-                if paragraph in head_paragraph:
-                    head_paragraph[paragraph].insert(int(sentence)-1, sentence)
+                    sentence = int(parts[4])
+                make_sure_input_file_exists(filename, paragraph, sentence, inputdir, f)
+                if filename in my_files:
+                    file_info = my_files.get(filename)
                 else:
-                    head_paragraph[paragraph] = [sentence]
-                file_info['head'] = head_paragraph
-            elif paragraph in file_info:
-                file_info[paragraph].insert(int(sentence)-1, sentence)
-            else:
-                file_info[paragraph] = [sentence]
-            my_files[filename] = file_info
+                    file_info = {}
+                if parts[1] == 'head':
+                    if 'head' in file_info:
+                        head_paragraph = file_info.get('head')
+                    else:
+                        head_paragraph = {}
+                    if paragraph in head_paragraph:
+                        head_paragraph[paragraph].insert(int(sentence)-1, sentence)
+                    else:
+                        head_paragraph[paragraph] = [sentence]
+                    file_info['head'] = head_paragraph
+                elif paragraph in file_info:
+                    file_info[paragraph].insert(int(sentence)-1, sentence)
+                else:
+                    file_info[paragraph] = [sentence]
+                my_files[filename] = file_info
+            except:
+                print("Could not read file {}".format(f))
     return my_files
 
 
@@ -462,10 +465,9 @@ def create_and_process_file(inputdir, file_info, raw, prefix, old_sentence, nafo
 def convert2naf(inputdir, outputdir = None):
 
     global offset, pid, sid
-    
+
     my_files = collect_file_info(inputdir)
     for k, v in my_files.items():
-        print(k)
         raw = ''
         word_count = 1
         offset = 0
@@ -483,12 +485,14 @@ def convert2naf(inputdir, outputdir = None):
         prefix = k + '.p.'
         old_sentence, raw, word_count, offset = create_and_process_file(inputdir, v, raw, prefix, old_sentence, nafobj, word_count, offset)
 
-        
-        print(k + ',' + str(pid) + ',' + str(sid))
-        nafobj.set_raw(raw)
-        nafobj.dump(outputdir + k + '.naf')
 
-   
+        #print(k + ',' + str(pid) + ',' + str(sid))
+        nafobj.set_raw(raw)
+        outfile = os.path.join(outputdir, k + '.naf')
+        #print(outfile)
+        nafobj.dump(outfile)
+
+
 
 def main(argv=None):
 
