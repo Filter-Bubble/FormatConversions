@@ -53,10 +53,10 @@ def get_constituent(alpino_node, word_count, words=[]):
             if len(words) < 1:
                 words.append([])
             identifier = int(child.get('begin')) + word_count
-            words[0].append('t' + str(identifier))
+            words[0].append('t_' + str(identifier))
             #FIXME: this is not the right way to identify the head (ignoring for now)
             if child.get('rel') == 'hd' and len(words) < 2:
-                words.append('t' + str(identifier))
+                words.append('t_' + str(identifier))
         else:
             words = get_constituent(child, word_count, words)
     return words
@@ -115,7 +115,7 @@ def find_propbank_rels(elem, nafobj, word_count):
                 myconstituent = get_constituent(ch, word_count, myconstituent)
             else:
                 identifier = int(ch.get('begin')) + word_count
-                myconstituent = [['t' + str(identifier)], ch.get('begin')]
+                myconstituent = [['t_' + str(identifier)], ch.get('begin')]
             if not pb in pb_dict:
                 pb_dict[pb] = [myconstituent]
             else:
@@ -305,8 +305,8 @@ def add_dependencies_to_naf(elem, nafobj, word_count):
             except:
                 print(rel_info.rel, rel_info.lemma_from, rel_info.lemma_to)
             naf_dependency.set_comment(comment)
-            naf_dependency.set_from('t' + str(rel_info.from_id))
-            naf_dependency.set_to('t' + str(dependent_id))
+            naf_dependency.set_from('t_' + str(rel_info.from_id))
+            naf_dependency.set_to('t_' + str(dependent_id))
             naf_dependency.set_function(rel_info.rel)
             nafobj.add_dependency(naf_dependency)
 
