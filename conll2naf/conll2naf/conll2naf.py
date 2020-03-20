@@ -4,6 +4,8 @@ import KafNafParserPy
 from xml.sax.saxutils import escape
 import os
 
+from .__version__ import __version__
+
 
 def create_naf(text):
     naf = KafNafParser(type="NAF")
@@ -83,21 +85,61 @@ def create_term_layer(knaf_obj, sentences, id_to_tokenid):
 def add_dependencies(knaf_obj, sentences, term_id_mapping):
     for s_id, sent in enumerate(sentences):
         for token in sent.tokens:
-            for dep in token['deps']:
-                rel, parent = dep
-                # Do not include root
-                if rel != 'root':
-                    # Creating comment
-                    parent_lemma = sent.tokens[parent-1]['lemma']
-                    str_comment = ' '+rel+'('+str(token['lemma'])+','+parent_lemma+') '
-                    str_comment = escape(str_comment, {"--":"&ndash"})
+            rel = token['deprel']
+            parent = str(token['head'])
+            # Do not include root
+            if rel != 'root' and parent != '0' and parent!= '_':
+                # Creating comment
+                parent = int(parent)
+                parent_lemma = str(sent.tokens[parent-1]['lemma'])
+                str_comment = ' '+rel+'('+str(token['lemma'])+','+parent_lemma+') '
+                str_comment = escape(str_comment, {"--":"&ndash"})
 
-                    my_dep = KafNafParserPy.Cdependency()
-                    my_dep.set_from(term_id_mapping.get((s_id, parent)))
-                    my_dep.set_to(term_id_mapping.get((s_id, token['id'])))
-                    my_dep.set_function(rel)
-                    my_dep.set_comment(str_comment)
-                    knaf_obj.add_dependency(my_dep)
+                my_dep = KafNafParserPy.Cdependency()
+                my_dep.set_from(term_id_mapping.get((s_id, parent)))
+                my_dep.set_to(term_id_mapping.get((s_id, token['id'])))
+                my_dep.set_function(rel)
+                my_dep.set_comment(str_comment)
+                knaf_obj.add_dependency(my_dep)
+
+def create_lp_object():
+
+    mylp = KafNafParserPy.Clp()
+    mylp.set_name("conll2naf")
+    mylp.set_version(__version__)
+    mylp.set_timestamp()
+    return mylp
+
+
+def create_layer_for_header(header, layer):
+
+    lingproc = KafNafParserPy.ClinguisticProcessors()
+    lingproc.set_layer(layer)
+    mylp = create_lp_object()
+    lingproc.add_linguistic_processor(mylp)
+
+    header.add_linguistic_processors(lingproc)
+
+
+def set_metadata(nafobj, filename, features):
+
+    nafobj.set_language("nl")
+    header = KafNafParserPy.CHeader()
+    filedesc = KafNafParserPy.CfileDesc()
+    filedesc.set_title(filename)
+    header.set_fileDesc(filedesc)
+
+    create_layer_for_header(header, 'raw')
+    if 'form' in features:
+        create_layer_for_header(header, 'text')
+    if 'lemma' in features and 'upos' in features and 'xpos' in features:
+        create_layer_for_header(header, 'terms')
+    if 'deps' in features:
+        create_layer_for_header(header, 'deps')
+
+    #create_layer_for_header(header, 'srl')
+
+    nafobj.set_header(header)
 
 
 def build_naf(conll_file, features, output_path, one_file_per_sent=False):
@@ -127,6 +169,9 @@ def build_naf(conll_file, features, output_path, one_file_per_sent=False):
         # Create deps layer
         if 'deps' in features:
             add_dependencies(naf_obj, docs[doc_id], term_id_mapping)
+
+        # Add header
+        set_metadata(naf_obj, doc_id, features)
 
         # Write NAF file
         naf_obj.dump(os.path.join(output_path, doc_id+'.naf'))
